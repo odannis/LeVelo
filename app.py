@@ -102,7 +102,6 @@ def chart():
     n_bike_available = [entry.n_bike_available for entry in bike_entries]
     mean_distance_bike = [entry.mean_distance_bike for entry in bike_entries]
     total_distant = [entry.mean_distance_bike * entry.n_bike_available for entry in bike_entries]
-    print(chart_labels)
     chart_script = f"""
     const ctx = document.getElementById('bikeChart').getContext('2d');
     const chart = new Chart(ctx, {{

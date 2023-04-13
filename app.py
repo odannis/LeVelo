@@ -39,7 +39,7 @@ def update_database():
                 db.session.commit()
             except Exception as e:
                 print(e)
-            time.sleep(60)  # Update every minute
+            time.sleep(70)  # Update every minute
 
 
 with app.app_context():
@@ -73,7 +73,6 @@ def get_chart_data(bikes):
             bike_ranges["n_bike_available"] += 1
     
     bike_ranges["mean_distance_bike"] = sum(l) / len(l) / 1000
-    print(bike_ranges)
     return bike_ranges
     
 @app.route('/')

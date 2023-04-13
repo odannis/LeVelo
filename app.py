@@ -24,20 +24,23 @@ class Bike(db.Model):
 def update_database():
     with app.app_context():
         while True:
-            response = requests.get(API_URL)
-            data = response.json()
-            bikes = data["data"]["bikes"]
-            chart_data = get_chart_data(bikes)
+            try:
+                response = requests.get(API_URL)
+                data = response.json()
+                bikes = data["data"]["bikes"]
+                chart_data = get_chart_data(bikes)
 
-            bike_entry = Bike(
-                n_bike_available=chart_data["n_bike_available"],
-                mean_distance_bike=chart_data["mean_distance_bike"],
-            )
+                bike_entry = Bike(
+                    n_bike_available=chart_data["n_bike_available"],
+                    mean_distance_bike=chart_data["mean_distance_bike"],
+                )
 
-            db.session.add(bike_entry)
-            db.session.commit()
-
+                db.session.add(bike_entry)
+                db.session.commit()
+            except Exception as e:
+                print(e)
             time.sleep(60)  # Update every minute
+
 
 with app.app_context():
     db.create_all()
@@ -79,10 +82,14 @@ def index():
     data = response.json()
     bikes = data['data']['bikes']
 
-    map = folium.Map(location=[43.296482, 5.36978], zoom_start=13)
+    map = folium.Map(location=[43.296482, 5.36978], zoom_start=14, max_zoom=19, attr="test")
+    latitude = []
 
     for bike in bikes:
         lat, lon = bike['lat'], bike['lon']
+        while (lat, lon) in latitude:
+            lat += 0.00003
+            lon += 0.00003
         bike_id = bike['bike_id']
         current_range_meters = bike['current_range_meters']
         popup_text = f"Vélo {bike_id}<br>Portée actuelle : {current_range_meters / 1000} km"
@@ -91,6 +98,7 @@ def index():
         else:
             icon = folium.Icon(icon="bicycle", prefix="fa", color="red")
         folium.Marker([lat, lon], popup=popup_text, icon=icon).add_to(map)
+        latitude.append((lat, lon))
 
     return render_template("map.html", map=map._repr_html_())
 

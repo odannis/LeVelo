@@ -72,4 +72,6 @@ def get_figures(x, y, name_figure, yaxis_title=""):
     return fig.to_html(full_html=False)
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=8080, use_reloader=False)
+    from waitress import serve
+    serve(app, host="0.0.0.0", port=8080)
+    #app.run(debug=True, host='0.0.0.0', port=8080, use_reloader=False)

@@ -1,52 +1,10 @@
 import requests
 import folium
-from flask import Flask, render_template
-from flask_sqlalchemy import SQLAlchemy
-import os
-import time
-import threading
-from datetime import datetime
-
-app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///bikes.db'
-db = SQLAlchemy(app)
-
-API_URL = "https://api.omega.fifteen.eu/gbfs/2.2/marseille/en/free_bike_status.json?&key=MjE0ZDNmMGEtNGFkZS00M2FlLWFmMWItZGNhOTZhMWQyYzM2"
-
-
-
-class Bike(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    n_bike_available = db.Column(db.Integer, nullable=False)
-    mean_distance_bike = db.Column(db.Integer, nullable=False)
-
-def update_database():
-    with app.app_context():
-        while True:
-            try:
-                response = requests.get(API_URL)
-                data = response.json()
-                bikes = data["data"]["bikes"]
-                chart_data = get_chart_data(bikes)
-
-                bike_entry = Bike(
-                    n_bike_available=chart_data["n_bike_available"],
-                    mean_distance_bike=chart_data["mean_distance_bike"],
-                )
-
-                db.session.add(bike_entry)
-                db.session.commit()
-            except Exception as e:
-                print(e)
-            time.sleep(70)  # Update every minute
-
-
-with app.app_context():
-    db.create_all()
-update_thread = threading.Thread(target=update_database, daemon=True)
-update_thread.start()
-
+from flask import render_template
+import database as database
+from database import app, API_URL
+import plotly.express as px
+import plotly.graph_objects as go
 
 def get_icon_color(current_range_meters):
     if current_range_meters < 2000:
@@ -57,23 +15,6 @@ def get_icon_color(current_range_meters):
         return "blue"
     else:
         return "green"
-    
-def get_chart_data(bikes):
-    bike_ranges = {
-        "n_bike_available": 0,
-        "mean_distance_bike": 0
-    }
-
-    l = []
-    for bike in bikes:
-        current_range_meters = bike["current_range_meters"]
-
-        if bike["is_disabled"] == False:
-            l.append(int(current_range_meters))
-            bike_ranges["n_bike_available"] += 1
-    
-    bike_ranges["mean_distance_bike"] = sum(l) / len(l) / 1000
-    return bike_ranges
     
 @app.route('/')
 def index():
@@ -103,56 +44,22 @@ def index():
 
 @app.route("/chart")
 def chart():
-    bike_entries = Bike.query.all()
-
-    chart_labels = [entry.timestamp.strftime("%Y-%m-%d %H:%M") for entry in bike_entries]
+    bike_entries = database.Bike.query.all()
+    chart_labels = [entry.timestamp.strftime("%Y-%m-%d %H:%M:%S") for entry in bike_entries]
     n_bike_available = [entry.n_bike_available for entry in bike_entries]
     mean_distance_bike = [entry.mean_distance_bike for entry in bike_entries]
     total_distant = [entry.mean_distance_bike * entry.n_bike_available for entry in bike_entries]
-    chart_script = f"""
-    const ctx = document.getElementById('bikeChart').getContext('2d');
-    const chart = new Chart(ctx, {{
-        type: 'line',
-        data: {{
-            labels: {chart_labels},
-            datasets: [
-                {{
-                    label: 'Nombre de vélo disponible',
-                    data: {n_bike_available},
-                    borderWidth: 1,
-                    fill: false,
-                    hidden: false,
-                }},
-                {{
-                    label: 'Distance moyenne des vélos',
-                    data: {mean_distance_bike},
-                    borderWidth: 1,
-                    fill: false,
-                    hidden: true,
-                }},
-                {{
-                    label: 'Distance totale des vélos',
-                    data: {total_distant},
-                    borderWidth: 1,
-                    fill: false,
-                    hidden: true,
-                }}
-            ]
-        }},
-        options: {{
-            scales: {{
-                x: {{
-                    type: 'time',
-                }},
-            }}
-        }}
-    }});
-    """
+    chart_1 = get_figures(chart_labels, n_bike_available, "Nombre de vélos disponibles", yaxis_title="Nombre de vélos")
+    chart_2 = get_figures(chart_labels, mean_distance_bike, "Distance moyenne des vélos", yaxis_title="Distance (km)")
+    chart_3 = get_figures(chart_labels, total_distant, "Distance totale des vélos", yaxis_title="Distance (km)")
+    return render_template('chart.html', chart_1=chart_1, chart_2=chart_2, chart_3=chart_3)
 
-    return render_template("chart.html", chart_script=chart_script)
-
-
-
+def get_figures(x, y, name_figure, yaxis_title=""):
+    fig = px.line(x=x, y=y)
+    fig.update_layout(title=name_figure,
+                   xaxis_title='Heure',
+                   yaxis_title=yaxis_title)
+    return fig.to_html(full_html=False)
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=8080)
+    app.run(debug=True, host='0.0.0.0', port=8080, use_reloader=False)

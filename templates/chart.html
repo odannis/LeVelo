@@ -2,21 +2,18 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Graphe</title>
+    <title>Chart</title>
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
         <a class="navbar-brand" href="/">Map</a>
-        <a class="navbar-brand" href="/chart">Graphe</a>
+        <a class="navbar-brand" href="/chart">Chart</a>
     </nav>
-    <div>
-        <canvas id="bikeChart"></canvas>
+    <div style="width: 90%;">
+        {{ chart_1 | safe }}
+        {{ chart_2 | safe }}
+        {{ chart_3 | safe }}
     </div>
-    <script>
-        {{ chart_script | safe }}
-    </script>
 </body>
 </html>

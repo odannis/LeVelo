@@ -4,7 +4,17 @@ from flask import render_template
 import database as database
 from database import app, API_URL
 import plotly.express as px
-import plotly.graph_objects as go
+import datetime
+import pytz
+
+def convert_datetime_timezone(dt : datetime.datetime, tz1="UTC", tz2="Europe/Paris"):
+    tz1 = pytz.timezone(tz1)
+    tz2 = pytz.timezone(tz2)
+
+    dt = tz1.localize(dt)
+    dt = dt.astimezone(tz2)
+    dt = dt.strftime("%Y-%m-%d %H:%M:%S")
+    return dt
 
 def get_icon_color(current_range_meters):
     if current_range_meters < 2000:
@@ -45,7 +55,7 @@ def index():
 @app.route("/chart")
 def chart():
     bike_entries = database.Bike.query.all()
-    chart_labels = [entry.timestamp.strftime("%Y-%m-%d %H:%M:%S") for entry in bike_entries]
+    chart_labels = [convert_datetime_timezone(entry.timestamp) for entry in bike_entries]
     n_bike_available = [entry.n_bike_available for entry in bike_entries]
     mean_distance_bike = [entry.mean_distance_bike for entry in bike_entries]
     total_distant = [entry.mean_distance_bike * entry.n_bike_available for entry in bike_entries]

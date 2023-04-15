@@ -6,6 +6,27 @@ from database import app, API_URL
 import plotly.express as px
 import datetime
 import pytz
+import logging
+from flask import Flask, request
+from functools import wraps
+import socket
+from waitress import serve
+
+#logging.basicConfig(level=logging.DEBUG)
+
+def get_ip_address():
+    hostname = socket.gethostname()
+    ip_address = socket.gethostbyname(hostname)
+    return ip_address
+
+def log_ip(f):
+    @wraps(f)
+    def wrapped(*args, **kwargs):
+        ip = request.remote_addr
+        app.logger.info(f"IP address: {ip}")
+        print(f"IP address: {ip}")
+        return f(*args, **kwargs)
+    return wrapped
 
 def convert_datetime_timezone(dt : datetime.datetime, tz1="UTC", tz2="Europe/Paris"):
     tz1 = pytz.timezone(tz1)
@@ -27,6 +48,7 @@ def get_icon_color(current_range_meters):
         return "green"
     
 @app.route('/')
+@log_ip
 def index():
     response = requests.get(API_URL)
     data = response.json()
@@ -53,6 +75,7 @@ def index():
     return render_template("map.html", map=map._repr_html_())
 
 @app.route("/chart")
+@log_ip
 def chart():
     bike_entries = database.Bike.query.all()
     chart_labels = [convert_datetime_timezone(entry.timestamp) for entry in bike_entries]
@@ -72,6 +95,8 @@ def get_figures(x, y, name_figure, yaxis_title=""):
     return fig.to_html(full_html=False)
 
 if __name__ == '__main__':
-    from waitress import serve
-    serve(app, host="0.0.0.0", port=8080)
+    port = 8080
+    ip_address = get_ip_address()
+    print(f"Starting server at http://{ip_address}:{port}")
+    serve(app, host="0.0.0.0", port=port)
     #app.run(debug=True, host='0.0.0.0', port=8080, use_reloader=False)

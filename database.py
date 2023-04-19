@@ -1,21 +1,17 @@
 from flask_sqlalchemy import SQLAlchemy
-from flask import Flask, render_template
+from flask import Flask
 from datetime import datetime
 import requests
-import folium
-from flask import Flask, render_template
+import numpy as np
 
-import os
 import time
 import threading
-
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///bikes.db'
 db = SQLAlchemy(app)
 
 API_URL = "https://api.omega.fifteen.eu/gbfs/2.2/marseille/en/free_bike_status.json?&key=MjE0ZDNmMGEtNGFkZS00M2FlLWFmMWItZGNhOTZhMWQyYzM2"
-
 
 class Bike(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -43,13 +39,13 @@ def get_chart_data(bikes):
             l.append(int(current_range_meters))
             bike_ranges["n_bike_available"] += 1
     
-    bike_ranges["mean_distance_bike"] = sum(l) / len(l) / 1000
+    bike_ranges["mean_distance_bike"] = np.mean(l) / 1000
     return bike_ranges
 
 def update_database():
-    with app.app_context():
-        while True:
-            try:
+    while True:
+        try:
+            with app.app_context():
                 response = requests.get(API_URL)
                 data = response.json()
                 bikes = data["data"]["bikes"]
@@ -62,13 +58,12 @@ def update_database():
 
                 db.session.add(bike_entry)
                 db.session.commit()
-            except Exception as e:
-                print(e)
-            time.sleep(10)  # Update every minute
+        except Exception as e:
+            print(response, response.status_code, e)
+        time.sleep(10)  # Update every minute
 
 
 with app.app_context():
     db.create_all()
-
-    update_thread = threading.Thread(target=update_database, daemon=True)
-    update_thread.start()
+update_thread = threading.Thread(target=update_database)
+update_thread.start()

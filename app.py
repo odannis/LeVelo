@@ -6,11 +6,9 @@ from database import app, API_URL
 import plotly.express as px
 import datetime
 import pytz
-import logging
 from flask import Flask, request
 from functools import wraps
 import socket
-from waitress import serve
 
 #logging.basicConfig(level=logging.DEBUG)
 
@@ -98,5 +96,5 @@ if __name__ == '__main__':
     port = 8080
     ip_address = get_ip_address()
     print(f"Starting server at http://{ip_address}:{port}")
-    serve(app, host="0.0.0.0", port=port)
-    #app.run(debug=True, host='0.0.0.0', port=8080, use_reloader=False)
+    #serve(app, host="0.0.0.0", port=port)
+    app.run(debug=True, host='0.0.0.0', port=8080, use_reloader=False)

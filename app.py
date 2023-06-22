@@ -93,8 +93,9 @@ def get_figures(x, y, name_figure, yaxis_title=""):
     return fig.to_html(full_html=False)
 
 if __name__ == '__main__':
+    from waitress import serve
     port = 8080
     ip_address = get_ip_address()
     print(f"Starting server at http://{ip_address}:{port}")
-    #serve(app, host="0.0.0.0", port=port)
-    app.run(debug=True, host='0.0.0.0', port=8080, use_reloader=False)
+    serve(app, host="0.0.0.0", port=port)
+    #app.run(debug=True, host='0.0.0.0', port=8080, use_reloader=False)

@@ -13,13 +13,19 @@ from waitress import serve
 import threading
 from flask_caching import Cache
 from folium.plugins import LocateControl
+import ssl
+import os
+import sys
 
 
 # Define the cache config keys, remember that it can be done in a settings file
 app.config['CACHE_TYPE'] = 'SimpleCache'  # You can also use "FileSystemCache" or "RedisCache" etc...
-
 # Initialize the cache
 cache = Cache(app)
+context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+path = os.path.dirname(os.path.realpath(sys.argv[0]))
+context.load_cert_chain(path + '/cert.pem', path + '/key.pem')
+
 
 def get_ip_address():
     hostname = socket.gethostname()
@@ -63,8 +69,8 @@ def update_map():
         bikes = data['data']['bikes']
         print("time request %s"%(time.time() - t))
 
-        map = folium.Map(location=[43.296482, 5.36978], min_zoom=11, zoom_start=14, max_zoom=19, attr="test", prefer_canvas=True)
-        LocateControl().add_to(map)
+        map = folium.Map(location=[43.296482, 5.36978], min_zoom=11, zoom_start=15, max_zoom=19, attr="test", prefer_canvas=True)
+        LocateControl(auto_start=True, flyTo=False, keepCurrentZoomLevel=True).add_to(map)
         latitude = []
 
         for bike in bikes:
@@ -123,9 +129,10 @@ def get_figures(x, y, name_figure, yaxis_title=""):
 map_out, chart_1, chart_2, chart_3 = None, None, None, None
 threading.Thread(target=update_map).start()
 threading.Thread(target=update_chart).start()
+
 if __name__ == '__main__':
     port = 8080
     ip_address = get_ip_address()
-    print(f"Starting server at http://{ip_address}:{port}")
-    serve(app, host="0.0.0.0", port=port)
-    #app.run(debug=True, host='0.0.0.0', port=8080, use_reloader=False)
+    print(f"Starting server at https://{ip_address}:{port}")
+    #serve(app, host="0.0.0.0", port=port)
+    app.run(host='0.0.0.0', port=8080, use_reloader=False, ssl_context=context)

@@ -6,3 +6,4 @@ requests
 pandas
 flask-caching
 flask_compress
+ssl

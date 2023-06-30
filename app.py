@@ -1,16 +1,24 @@
 import requests
 import folium
-from flask import render_template
+from flask import render_template, request
 import database as database
 from database import app, API_URL
 import plotly.express as px
 import datetime
 import pytz
-from flask import Flask, request
 from functools import wraps
 import socket
+import time
+from waitress import serve
+import threading
+from flask_caching import Cache
 
-#logging.basicConfig(level=logging.DEBUG)
+# Define the cache config keys, remember that it can be done in a settings file
+app.config['CACHE_TYPE'] = 'SimpleCache'  # You can also use "FileSystemCache" or "RedisCache" etc...
+
+# Initialize the cache
+cache = Cache(app)
+render_map = None
 
 def get_ip_address():
     hostname = socket.gethostname()
@@ -45,14 +53,15 @@ def get_icon_color(current_range_meters):
     else:
         return "green"
     
-@app.route('/')
-@log_ip
-def index():
+def update_map():
+    global render_map
+    t = time.time()
     response = requests.get(API_URL)
     data = response.json()
     bikes = data['data']['bikes']
+    print("time request %s"%(time.time() - t))
 
-    map = folium.Map(location=[43.296482, 5.36978], zoom_start=14, max_zoom=19, attr="test")
+    map = folium.Map(location=[43.296482, 5.36978], min_zoom=11, zoom_start=14, max_zoom=19, attr="test", prefer_canvas=True)
     latitude = []
 
     for bike in bikes:
@@ -70,9 +79,48 @@ def index():
         folium.Marker([lat, lon], popup=popup_text, icon=icon).add_to(map)
         latitude.append((lat, lon))
 
-    return render_template("map.html", map=map._repr_html_())
+    map = map._repr_html_()
+    print("Temps d'exécution : ", time.time() - t)
+    render_map = render_template("map.html", map=map)
+
+    
+@app.route('/')
+@log_ip
+@cache.cached(timeout=50)  # cache for 50 seconds
+def index():
+    t = time.time()
+    response = requests.get(API_URL)
+    data = response.json()
+    bikes = data['data']['bikes']
+    print("time request %s"%(time.time() - t))
+
+    map = folium.Map(location=[43.296482, 5.36978], min_zoom=11, zoom_start=14, max_zoom=19, attr="test", prefer_canvas=True)
+    latitude = []
+
+    for bike in bikes:
+        lat, lon = bike['lat'], bike['lon']
+        while (lat, lon) in latitude:
+            lat += 0.00003
+            lon += 0.00003
+        bike_id = bike['bike_id']
+        current_range_meters = bike['current_range_meters']
+        popup_text = f"Vélo {bike_id}<br>Portée actuelle : {current_range_meters / 1000} km"
+        if bike["is_disabled"] == False:
+            icon = folium.Icon(icon="bicycle", prefix="fa", color=get_icon_color(current_range_meters))
+        else:
+            icon = folium.Icon(icon="bicycle", prefix="fa", color="red")
+        folium.Marker([lat, lon], popup=popup_text, icon=icon).add_to(map)
+        latitude.append((lat, lon))
+
+    map = map._repr_html_()
+    print("Temps d'exécution : ", time.time() - t)
+    out = render_template("map.html", map=map)
+
+    print("Temps d'exécution : ", time.time() - t)
+    return out
 
 @app.route("/chart")
+@cache.cached(timeout=50)  # cache for 50 seconds
 @log_ip
 def chart():
     bike_entries = database.Bike.query.all()
@@ -93,9 +141,15 @@ def get_figures(x, y, name_figure, yaxis_title=""):
     return fig.to_html(full_html=False)
 
 if __name__ == '__main__':
-    from waitress import serve
     port = 8080
     ip_address = get_ip_address()
     print(f"Starting server at http://{ip_address}:{port}")
     serve(app, host="0.0.0.0", port=port)
     #app.run(debug=True, host='0.0.0.0', port=8080, use_reloader=False)
+
+def cache_function():
+    while True:
+        index()
+        time.sleep(10)
+# Start the background thread
+threading.Thread(target=cache_function).start()

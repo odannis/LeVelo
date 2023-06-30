@@ -10,6 +10,7 @@ import threading
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///bikes.db'
 db = SQLAlchemy(app)
+bikes = None
 
 API_URL = "https://api.omega.fifteen.eu/gbfs/2.2/marseille/en/free_bike_status.json?&key=MjE0ZDNmMGEtNGFkZS00M2FlLWFmMWItZGNhOTZhMWQyYzM2"
 
@@ -43,6 +44,7 @@ def get_chart_data(bikes):
     return bike_ranges
 
 def update_database():
+    global bikes
     while True:
         try:
             with app.app_context():
@@ -60,10 +62,11 @@ def update_database():
                 db.session.commit()
         except Exception as e:
             print(response, response.status_code, e)
-        time.sleep(10)  # Update every minute
+        time.sleep(60)  # Update every minute
 
 
 with app.app_context():
     db.create_all()
+
 update_thread = threading.Thread(target=update_database)
 update_thread.start()

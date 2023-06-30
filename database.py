@@ -3,6 +3,7 @@ from flask import Flask
 from datetime import datetime
 import requests
 import numpy as np
+from flask_compress import Compress
 
 import time
 import threading
@@ -10,7 +11,7 @@ import threading
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///bikes.db'
 db = SQLAlchemy(app)
-bikes = None
+Compress(app)
 
 API_URL = "https://api.omega.fifteen.eu/gbfs/2.2/marseille/en/free_bike_status.json?&key=MjE0ZDNmMGEtNGFkZS00M2FlLWFmMWItZGNhOTZhMWQyYzM2"
 
@@ -44,7 +45,6 @@ def get_chart_data(bikes):
     return bike_ranges
 
 def update_database():
-    global bikes
     while True:
         try:
             with app.app_context():

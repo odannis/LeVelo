@@ -12,6 +12,8 @@ import time
 from waitress import serve
 import threading
 from flask_caching import Cache
+from folium.plugins import LocateControl
+
 
 # Define the cache config keys, remember that it can be done in a settings file
 app.config['CACHE_TYPE'] = 'SimpleCache'  # You can also use "FileSystemCache" or "RedisCache" etc...
@@ -62,6 +64,7 @@ def update_map():
         print("time request %s"%(time.time() - t))
 
         map = folium.Map(location=[43.296482, 5.36978], min_zoom=11, zoom_start=14, max_zoom=19, attr="test", prefer_canvas=True)
+        LocateControl().add_to(map)
         latitude = []
 
         for bike in bikes:

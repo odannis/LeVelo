@@ -16,6 +16,7 @@ from folium.plugins import LocateControl
 import ssl
 import os
 import sys
+import numpy as np
 
 
 # Define the cache config keys, remember that it can be done in a settings file
@@ -40,6 +41,19 @@ def log_ip(f):
         print(f"IP address: {ip}")
         return f(*args, **kwargs)
     return wrapped
+
+
+def timeit(my_func):
+    @wraps(my_func)
+    def timed(*args, **kw):
+    
+        tstart = time.time()
+        output = my_func(*args, **kw)
+        tend = time.time()
+        
+        print('"{}" took {:.3f} s to execute\n'.format(my_func.__name__, (tend - tstart)))
+        return output
+    return timed
 
 def convert_datetime_timezone(dt : datetime.datetime, tz1="UTC", tz2="Europe/Paris"):
     tz1 = pytz.timezone(tz1)
@@ -69,7 +83,8 @@ def update_map():
         bikes = data['data']['bikes']
         print("time request %s"%(time.time() - t))
 
-        map = folium.Map(location=[43.296482, 5.36978], min_zoom=11, zoom_start=15, max_zoom=19, attr="test", prefer_canvas=True)
+        map = folium.Map(location=[43.296482, 5.36978], min_zoom=11, zoom_start=15,
+                          max_zoom=19, attr="test", prefer_canvas=True)
         LocateControl(auto_start=True, flyTo=False, keepCurrentZoomLevel=True).add_to(map)
         latitude = []
 
@@ -92,33 +107,51 @@ def update_map():
         print("Temps d'exécution : ", time.time() - t)
         time.sleep(31)
 
-    
+
 @app.route('/')
 @log_ip
 def index():
     render_map = render_template("map.html", map=map_out)
     return render_map
 
-@app.route("/chart")
-@log_ip
-def chart():
-    return render_template('chart.html', chart_1=chart_1, chart_2=chart_2, chart_3=chart_3)
+@app.route('/chart', methods=['GET'])
+@timeit
+def chart(start_datetime=None, end_datetime=None):
+    if "start_datetime" in request.args and "end_datetime" in request.args:
+        start_datetime = datetime.datetime.fromisoformat(request.args.get('start_datetime'))
+        end_datetime = datetime.datetime.fromisoformat(request.args.get('end_datetime'))
+    else:
+        start_datetime = datetime.datetime.now() - datetime.timedelta(days=3)
+        end_datetime = datetime.datetime.now()
+    chart_1, chart_2 = update_chart(start_datetime=start_datetime, end_datetime=end_datetime)
+    return render_template('chart.html', chart_1=chart_1, chart_2=chart_2)
 
-def update_chart():
-    global chart_1, chart_2, chart_3
-    while True:
-        with app.app_context():
+@timeit
+def update_chart(start_datetime=None, end_datetime=None):
+    #global chart_1, chart_2, chart_3
+    print("update chart")
+    with app.app_context():
+        t = time.time()
+        if start_datetime and end_datetime:
+            bike_entries = database.Bike.query.filter(database.Bike.timestamp.between(start_datetime, end_datetime)).all()
+        else:
             bike_entries = database.Bike.query.all()
-            chart_labels = [convert_datetime_timezone(entry.timestamp) for entry in bike_entries]
-            n_bike_available = [entry.n_bike_available for entry in bike_entries]
-            mean_distance_bike = [entry.mean_distance_bike for entry in bike_entries]
-            total_distant = [entry.mean_distance_bike * entry.n_bike_available for entry in bike_entries]
-            chart_1 = get_figures(chart_labels, n_bike_available, "Nombre de vélos disponibles", yaxis_title="Nombre de vélos")
-            chart_2 = get_figures(chart_labels, mean_distance_bike, "Distance moyenne des vélos", yaxis_title="Distance (km)")
-            chart_3 = get_figures(chart_labels, total_distant, "Distance totale des vélos", yaxis_title="Distance (km)")
-            time.sleep(60*61)
-    
+        print("Time call database %s"%(time.time() - t))
+        chart_labels = [entry.timestamp for entry in bike_entries]         
+        n_bike_available = [entry.n_bike_available for entry in bike_entries]
+        mean_distance_bike = [entry.mean_distance_bike for entry in bike_entries]
+        #total_distant = [entry.mean_distance_bike * entry.n_bike_available for entry in bike_entries]
+        chart_1 = get_figures(chart_labels, n_bike_available, "Nombre de vélos disponibles", yaxis_title="Nombre de vélos")
+        chart_2 = get_figures(chart_labels, mean_distance_bike, "Distance moyenne des vélos", yaxis_title="Distance (km)")
+        #chart_3 = get_figures(chart_labels, total_distant, "Distance totale des vélos", yaxis_title="Distance (km)")
+    return chart_1, chart_2
+
+@timeit
 def get_figures(x, y, name_figure, yaxis_title=""):
+    max_point = 1000
+    l = np.linspace(0, len(x), max_point, dtype=int)
+    x = [convert_datetime_timezone(x[i]) for i in l[:-1]]
+    y = [np.mean(y[l[i]:l[i+1]]) for i in range(len(l)-1)]
     fig = px.line(x=x, y=y)
     fig.update_layout(title=name_figure,
                    xaxis_title='Heure',
@@ -126,9 +159,11 @@ def get_figures(x, y, name_figure, yaxis_title=""):
     return fig.to_html(full_html=False)
 
 
-map_out, chart_1, chart_2, chart_3 = None, None, None, None
+
+
+map_out = None, None, None, None
+
 threading.Thread(target=update_map).start()
-threading.Thread(target=update_chart).start()
 
 if __name__ == '__main__':
     port = 8080

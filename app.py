@@ -77,33 +77,36 @@ def get_icon_color(current_range_meters):
 def update_map():
     global map_out
     while True:
-        t = time.time()
-        response = requests.get(API_URL)
-        data = response.json()
-        bikes = data['data']['bikes']
-        print("time request %s"%(time.time() - t))
+        try:
+            t = time.time()
+            response = requests.get(API_URL)
+            data = response.json()
+            bikes = data['data']['bikes']
+            print("time request %s"%(time.time() - t))
 
-        map = folium.Map(location=[43.296482, 5.36978], min_zoom=11, zoom_start=15,
-                          max_zoom=19, attr="test", prefer_canvas=True)
-        LocateControl(auto_start=True, flyTo=False, keepCurrentZoomLevel=True).add_to(map)
-        latitude = []
+            map = folium.Map(location=[43.296482, 5.36978], min_zoom=11, zoom_start=15,
+                            max_zoom=19, attr="test", prefer_canvas=True)
+            LocateControl(auto_start=True, flyTo=False, keepCurrentZoomLevel=True).add_to(map)
+            latitude = []
 
-        for bike in bikes:
-            lat, lon = bike['lat'], bike['lon']
-            while (lat, lon) in latitude:
-                lat += 0.00003
-                lon += 0.00003
-            bike_id = bike['bike_id']
-            current_range_meters = bike['current_range_meters']
-            popup_text = f"Vélo {bike_id}<br>Portée actuelle : {current_range_meters / 1000} km"
-            if bike["is_disabled"] == False:
-                icon = folium.Icon(icon="bicycle", prefix="fa", color=get_icon_color(current_range_meters))
-            else:
-                icon = folium.Icon(icon="bicycle", prefix="fa", color="red")
-            folium.Marker([lat, lon], popup=popup_text, icon=icon).add_to(map)
-            latitude.append((lat, lon))
+            for bike in bikes:
+                lat, lon = bike['lat'], bike['lon']
+                while (lat, lon) in latitude:
+                    lat += 0.00003
+                    lon += 0.00003
+                bike_id = bike['bike_id']
+                current_range_meters = bike['current_range_meters']
+                popup_text = f"Vélo {bike_id}<br>Portée actuelle : {current_range_meters / 1000} km"
+                if bike["is_disabled"] == False:
+                    icon = folium.Icon(icon="bicycle", prefix="fa", color=get_icon_color(current_range_meters))
+                else:
+                    icon = folium.Icon(icon="bicycle", prefix="fa", color="red")
+                folium.Marker([lat, lon], popup=popup_text, icon=icon).add_to(map)
+                latitude.append((lat, lon))
 
-        map_out = map._repr_html_()
+            map_out = map._repr_html_()
+        except Exception as e:
+            print("Update map fail : ", e)
         print("Temps d'exécution : ", time.time() - t)
         time.sleep(31)
 

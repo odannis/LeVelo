@@ -75,7 +75,7 @@ def get_icon_color(current_range_meters):
         return "green"
     
 def update_map():
-    global map_out
+    global render_map
     while True:
         try:
             t = time.time()
@@ -105,6 +105,8 @@ def update_map():
                 latitude.append((lat, lon))
 
             map_out = map._repr_html_()
+            with app.app_context():
+                render_map = render_template("map.html", map=map_out)
         except Exception as e:
             print("Update map fail : ", e)
         print("Temps d'exécution : ", time.time() - t)
@@ -114,7 +116,6 @@ def update_map():
 @app.route('/')
 @log_ip
 def index():
-    render_map = render_template("map.html", map=map_out)
     return render_map
 
 @app.route('/chart', methods=['GET'])
@@ -164,7 +165,7 @@ def get_figures(x, y, name_figure, yaxis_title=""):
 
 
 
-map_out = None, None, None, None
+render_map = None 
 
 threading.Thread(target=update_map).start()
 
